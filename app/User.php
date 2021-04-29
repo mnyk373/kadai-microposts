@@ -66,7 +66,7 @@ class User extends Authenticatable
      */
     public function loadRelationshipCounts()
     {
-        $this->loadCount(['microposts', 'followings', 'followers']);
+        $this->loadCount(['microposts', 'followings', 'followers', 'favorites']);
     }
     
     /**
@@ -138,5 +138,72 @@ class User extends Authenticatable
         $userIds[] = $this->id;
         // それらのユーザが所有する投稿に絞り込む
         return Micropost::whereIn('user_id', $userIds);
+    }
+    
+
+
+
+    /**
+     * このユーザが追加したお気に入りの一覧（Micropostモデルとの関係を定義）
+     * memo:belongsToMany(Modelクラス,中間テーブル,中間テーブルカラム（自身）,中間テーブルカラム（関係先）
+     */
+    public function favorites()
+    {
+        return $this->belongsToMany(Micropost::class, 'favorites', 'user_id', 'micropost_id')->withTimestamps();
+    }
+    
+    
+    /**
+     * 指定された $micropostsIdをこのユーザがお気に入り登録しているか調べる。登録しているならtrueを返す。
+     *
+     * @param  int  $micropostsId
+     * @return bool
+     */
+    public function is_favorite($micropostsId)
+    {
+        // フォロー中ユーザの中に $userIdのものが存在するか
+        return $this->favorites()->where('micropost_id', $micropostsId)->exists();
+    }
+    
+    /**
+     * $micropostsIdで指定された投稿をお気に入りに追加する。
+     *
+     * @param  int  $micropostsId
+     * @return bool
+     */
+    public function favorite($micropostsId)
+    {
+        // すでにお気に入り追加しているかの確認
+        $exist = $this->is_favorite($micropostsId);
+
+        if ($exist) {
+            // すでにお気に入り追加していれば何もしない
+            return false;
+        } else {
+            // お気に入りに追加されてなければ追加する
+            $this->favorites()->attach($micropostsId);
+            return true;
+        }
+    }
+    
+    /**
+     * $micropostsIdで指定された投稿をお気に入りから削除する。
+     *
+     * @param  int  $micropostsId
+     * @return bool
+     */
+    public function unfavorite($micropostsId)
+    {
+        // すでにお気に入り追加しているかの確認
+        $exist = $this->is_favorite($micropostsId);
+
+        if ($exist) {
+            // すでにお気に入り追加していれば、お気に入りから削除
+            $this->favorites()->detach($micropostsId);
+            return true;
+        } else {
+            // お気に入りに追加されてなければ何もしない
+            return false;
+        }
     }
 }
